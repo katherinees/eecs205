@@ -36,86 +36,69 @@ DrawLine PROC USES eax ebx ecx edx esi x0:DWORD, y0:DWORD, x1:DWORD, y1:DWORD, c
 	;; Place your code here
 
       mov eax, x1
-      sub eax, x0
-      jge x_already_pos
+      mov inc_x, 1
+      sub eax, x0          ;; eax <- x1-x0
+      cmp eax, 0
+      jg x_already_pos     ;; jump if x1-x0 > 0 ie x0 < x1
       neg eax
+      neg inc_x
 x_already_pos:
       mov delta_x, eax
 
       mov eax, y1
-      sub eax, y0
-      jge y_already_pos
+      mov inc_y, 1
+      sub eax, y0           ;; eax <- y1-y0
+      cmp eax, 0
+      jg y_already_pos      ;; jump if y1-y0 > 0 ie y0 < y1
       neg eax
-   y_already_pos:
+      neg inc_y
+y_already_pos:
       mov delta_y, eax
 
-      mov eax, x0
-      mov inc_x, 1
-      cmp eax, x1
-      jl inc_continue
-      neg inc_x ; Negate ix iff x0>=x1
-
-   inc_continue:
-      mov eax, y0
-      mov inc_y, 1
-      cmp eax, y1
-      jl delta_setup
-      neg inc_y
-
-   delta_setup:
+delta_setup:
       mov eax, delta_x
       xor edx, edx
       mov ebx, 2
-      cmp eax, delta_y ; Actual comparison
-      jle error_else
+      cmp eax, delta_y
+      jle error_else        ;; jump if delta_x <= delta_y
       idiv ebx
       jmp error_continue
-   error_else:
-      ;; else error=-delta_y/2
-      mov eax, delta_y ; To correctly divide deltay
+error_else:
+      mov eax, delta_y
       idiv ebx
       neg eax
 
-   error_continue:
-      mov ebx, x0 ; ebx is curr_x
-      mov ecx, y0 ; ecx is curr_y
+error_continue:             ;; at this point, eax <- error
+      mov ebx, x0
+      mov ecx, y0
       invoke DrawPixel, ebx, ecx, color
 
-    ;; Now, the drawing loop.
-    ;; First, the conditional
- condition:
-      ;; while (curr_x!=x1 OR curr_y!=y1)
-      cmp ebx, x1
-      jne body ; Jump to body if curr_x!=x1
-      cmp ecx, y1
-      jne body ; Jump to body if curr_y!=y1
-	ret
+      jmp condition
 
-    ;; Loop body
- body:
+body:
       invoke DrawPixel, ebx, ecx, color
+      mov edx, eax          ;; edx <- prev_error
 
-      ;; prev_error=error
-      mov edx, eax ; edx is prev_error
-
-      mov esi, delta_x ; So we can negate deltax
+      mov esi, delta_x
       neg esi
       cmp edx, esi
-      jle nextif
-      ;; error=error-delta_y
-      ;; curr_x=curr_x+inc_x
-      sub eax, delta_y
+      jle nextif            ;; jump if prev_error <= -delta_x
+      sub eax, delta_y      ;; otherwise, error -= delta_y, curr_x += inc_x
       add ebx, inc_x
 
-   nextif:
-      ;; if (prev_error<delta_y)
+nextif:
       cmp edx, delta_y
-      jge condition ; If prev_error>=delta_y, jump back to the conditional early. Else...
-      ;; error=error+delta_x
-      ;; curr_y=curr_y=inc_y
+      jge condition
       add eax, delta_x
       add ecx, inc_y
-      jmp condition ; Jump back to the conditional
+
+condition:
+      cmp ebx, x1
+      jne body
+      cmp ecx, y1
+      jne body
+      ret
+
 DrawLine ENDP
 
 END
