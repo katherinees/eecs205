@@ -24,7 +24,7 @@ DrawStarField proc
 	;; Place your code here
 
     DrawStar proto x:DWORD, y:DWORD
-    
+
     INVOKE DrawStar, 040d, 030d
     INVOKE DrawStar, 080d, 060d
     INVOKE DrawStar, 120d, 090d
