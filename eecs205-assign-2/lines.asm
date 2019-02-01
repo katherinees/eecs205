@@ -2,6 +2,7 @@
 ;
 ;   lines.asm - Assembly file for EECS205 Assignment 2
 ;
+;   Katherine Steiner
 ;
 ; #########################################################################
 
@@ -26,85 +27,95 @@ include lines.inc
 
 ;;   For example, if your procedure uses only the eax and ebx registers
 ;;      DrawLine PROC USES eax ebx x0:DWORD, y0:DWORD, x1:DWORD, y1:DWORD, color:DWORD
-DrawLine PROC uses eax ebx ecx edx esi edi x0:DWORD, y0:DWORD, x1:DWORD, y1:DWORD, color:DWORD
+DrawLine PROC USES eax ebx ecx edx esi x0:DWORD, y0:DWORD, x1:DWORD, y1:DWORD, color:DWORD
 	;; Feel free to use local variables...declare them here
 	;; For example:
 	;; 	LOCAL foo:DWORD, bar:DWORD
-  LOCAL delta_x:DWORD, delta_y:DWORD, inc_x:DWORD, inc_y:DWORD, error:DWORD
+    LOCAL delta_x:DWORD, delta_y:DWORD, inc_x:DWORD, inc_y:DWORD
 
 	;; Place your code here
-  mov inc_x, 1           ;; inc_x <- 1 if x1-x0>0 ie x0<x1
-  mov eax, x1
-  sub eax, x0
-  cmp eax, 0             ;; eax <- x1-x0
-  jg x_already_pos
-  neg eax
-  neg inc_x              ;; inc_x <- -1 if x1-x0<=0 ie x0>=x1
+
+      mov eax, x1
+      sub eax, x0
+      jge x_already_pos
+      neg eax
 x_already_pos:
-  mov delta_x, eax       ;; delta_x <- |x1-x0|
+      mov delta_x, eax
 
-  mov inc_y, 1           ;; inc_y <- 1 if y1-y0>0 ie y0<y1
-  mov eax, y1
-  sub eax, y0
-  cmp eax, 0             ;; eax <- y1-y0
-  jg y_already_pos
-  neg eax
-  neg inc_y              ;; inc_y <- -1 if y1-y0<=0 ie y0>=y1
-y_already_pos:
-  mov delta_y, eax       ;; delta_y <- |y1-y0|
+      mov eax, y1
+      sub eax, y0
+      jge y_already_pos
+      neg eax
+   y_already_pos:
+      mov delta_y, eax
 
-  xor edx, edx
-  mov eax, delta_x
-  cmp eax, delta_y
-  jle error_else
-  mov edx, 2
-  idiv edx                 ;; eax <- delta_x/2
-  jmp error_continue
-error_else:
-  mov eax, delta_y
-  neg eax
-  mov edx, 2
-  idiv edx                 ;; eax <- -delta_y/2
-error_continue:          ;; eax <- error
-  mov error, eax
+      mov eax, x0
+      mov inc_x, 1
+      cmp eax, x1
+      jl inc_continue
+      neg inc_x ; Negate ix iff x0>=x1
 
-  mov ebx, x0            ;; ebx <- current_x
-  mov ecx, y0            ;; ecx <- current_y
-  invoke DrawPixel, ebx, ecx, color
-  jmp condition
+   inc_continue:
+      mov eax, y0
+      mov inc_y, 1
+      cmp eax, y1
+      jl delta_setup
+      neg inc_y
 
-body:
-  invoke DrawPixel, ebx, ecx, color
+   delta_setup:
+      mov eax, delta_x
+      xor edx, edx
+      mov ebx, 2
+      cmp eax, delta_y ; Actual comparison
+      jle error_else
+      idiv ebx
+      jmp error_continue
+   error_else:
+      ;; else error=-delta_y/2
+      mov eax, delta_y ; To correctly divide deltay
+      idiv ebx
+      neg eax
 
-  mov edx, error         ;; edx <- prev_error = error
+   error_continue:
+      mov ebx, x0 ; ebx is curr_x
+      mov ecx, y0 ; ecx is curr_y
+      invoke DrawPixel, ebx, ecx, color
 
-  mov edi, delta_x
-  neg edi                ;; edi <- -delta_x
-  cmp edx, edi           ;; cmp prev_error, -delta_x
-  jle nextif
-  mov esi, error         ;; esi <- error
-  sub esi, delta_y       ;; esi <- error - delta_y
-  mov error, esi         ;; error <- error - delta_y
-  add ebx, inc_x         ;; curr_x += inc_x
-nextif:
-  cmp edx, delta_y       ;; cmp prev_error, delta_y
-  jge condition
-  mov esi, error         ;; esi <- error
-  add esi, delta_x       ;; esi <- error + delta_x
-  mov error, esi         ;; error <- error + delta_x
-  add ecx, inc_y         ;; curr_y += inc_y
+    ;; Now, the drawing loop.
+    ;; First, the conditional
+ condition:
+      ;; while (curr_x!=x1 OR curr_y!=y1)
+      cmp ebx, x1
+      jne body ; Jump to body if curr_x!=x1
+      cmp ecx, y1
+      jne body ; Jump to body if curr_y!=y1
+	ret
 
-condition:
-  cmp ebx, x1
-  jne body
-  cmp ecx, y1
-  jne body
+    ;; Loop body
+ body:
+      invoke DrawPixel, ebx, ecx, color
 
+      ;; prev_error=error
+      mov edx, eax ; edx is prev_error
 
-	ret        	;;  Don't delete this line...you need it
+      mov esi, delta_x ; So we can negate deltax
+      neg esi
+      cmp edx, esi
+      jle nextif
+      ;; error=error-delta_y
+      ;; curr_x=curr_x+inc_x
+      sub eax, delta_y
+      add ebx, inc_x
+
+   nextif:
+      ;; if (prev_error<delta_y)
+      cmp edx, delta_y
+      jge condition ; If prev_error>=delta_y, jump back to the conditional early. Else...
+      ;; error=error+delta_x
+      ;; curr_y=curr_y=inc_y
+      add eax, delta_x
+      add ecx, inc_y
+      jmp condition ; Jump back to the conditional
 DrawLine ENDP
-
-
-
 
 END
